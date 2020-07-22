@@ -1,0 +1,9 @@
+############### This is my first gitignore file. ###############
+
+#Ignore all .meta files
+*.meta
+
+#Ignore all of this directories
+Logs/
+Library/
+Packages/
