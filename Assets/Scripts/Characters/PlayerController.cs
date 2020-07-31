@@ -1,16 +1,22 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+[RequireComponent(typeof(Animator))]
 public class PlayerController : MonoBehaviour
 {
+    [Header("Food Settings")]
     [Tooltip("Amount food the player start with it")]
     [SerializeField] private int _startFood = 100;
 
     [Tooltip("Value for each action player do")]
-    [SerializeField] private int _eatFood = 1;
+    [SerializeField] private int _walkFood = 1;
+
+    [Tooltip("Value for broke a wall")]
+    [SerializeField] private int _brokeWallFood = 2;
+
+    [Header("Clips")]
+    [SerializeField] private AudioClip _dieClip = null;
 
     [Space]
     [SerializeField] private ProceduralBoardGenerate _proceduralBoard = null;
@@ -22,32 +28,39 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private UnityEvent _OnStarve = null;
     [SerializeField] private UnityEvent _OnExit = null;
 
+    private Subject _subject;
+
     private Movement _movement;
     private Breaker _breaker;
+    private Animator _anim;    
+    
+    private bool isLive;
+    private bool _isMyTurn;
 
-    private int _food;
-
-    public int X { get; private set; }
-    public int Y { get; private set; }
+    public int Food { get ; private set; }
 
     private void Awake()
     {
+        _subject = new Subject();
+        
         _movement = GetComponent<Movement>();
         _breaker = GetComponent<Breaker>();
-
-        _food = _startFood;
-
-        X = (int)transform.position.x;
-        Y = (int)transform.position.y;
+        _anim = GetComponent<Animator>();
     }
-
+    private void OnEnable()
+    {        
+        isLive = true;
+        Food = _startFood;
+        
+        ChangeFoodAmount();        
+    }
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if(collision.CompareTag("Soda") || collision.CompareTag("Food"))
         {
             var food = collision.GetComponent<Food>();
 
-            EatFood(food.Eat());
+            TakeFood(food.Eat());
         }
         else if(collision.CompareTag("Exit"))
         {
@@ -57,6 +70,9 @@ public class PlayerController : MonoBehaviour
 
     public void InputHandle(InputDirection direction)
     {
+        if (!_isMyTurn) //Only play if its turn of player
+            return;
+
         if(direction != InputDirection.None)
         {
             int x = (int)transform.position.x;
@@ -71,47 +87,85 @@ public class PlayerController : MonoBehaviour
             else if(direction == InputDirection.Down)
                 y--;
 
-            Action(x, y);
-            _OnAction?.Invoke();
+            if(MakeAction(x, y))
+            {
+                _isMyTurn = false;
+                
+                _OnAction?.Invoke();
+            }
 
-            X = (int)transform.position.x;
-            Y = (int)transform.position.y;
+            _subject?.Notify(ObserverEvent.FirstInput);
         }
     }
-    public void LoseFood(int amount)
+    public void TakeDamage(int amount)
     {
-        _food -= amount;
-        ChangeFoodAmount();
+        _anim.SetTrigger("Hit");        
+        LostFood(amount);
     }
-        
-    private void Action(int x, int y)
+    public void AddObserverOnFirstInput(IObserver observer) => _subject.AddObserver(observer);
+    public void AddObserverOnFirstDeath(IObserver observer) => _subject.AddObserver(observer);
+    public void RemoveObserverOnFirstInput(IObserver observer) => _subject.RemoveObserver(observer);
+    public void RemoveObserverOnFirstDeath(IObserver observer) => _subject.RemoveObserver(observer);
+    public void OnDisappear()
     {
-        if(_proceduralBoard.IsWalkableTile(x, y))
+        //This method is called when the die animations is end.
+        gameObject.SetActive(false);
+        _OnStarve?.Invoke();
+        _subject.Notify(ObserverEvent.FirstDeath);
+    }    
+    public void SetTurn(bool isMyTurn)
+    {
+        if (isLive)
+            _isMyTurn = isMyTurn;
+    }
+    
+    private bool MakeAction(int x, int y)
+    {
+        bool makeAction = false;
+
+        if(!_proceduralBoard.HasEnemy(x, y))
         {
-            _movement.Move(x, y);
-            LoseFood(_eatFood);
+            if(_proceduralBoard.IsWalkableTile(x, y))
+            {
+                _movement.Move(x, y);
+                LostFood(_walkFood);
+                makeAction = true;
+            }
+            else if(_proceduralBoard.IsBreakableTile(x, y))
+            {
+                _breaker.BreakTile(x, y);
+                _anim.SetTrigger("Chop");
+                LostFood(_brokeWallFood);
+                makeAction = true;
+            }
         }
-        else if(_proceduralBoard.IsBreakableTile(x, y))
-        {
-            _breaker.BreakTile(x, y);
-            LoseFood(_eatFood);
-        }
+
+        return makeAction;
     }
     private void ChangeFoodAmount()
     {
-        _OnChangeFood?.Invoke(_food);
+        _OnChangeFood?.Invoke(Food);        
 
-        Debug.Log("Food " + _food);
-
-        if (_food <= 0)
-            _OnStarve?.Invoke();
+        if (Food <= 0)
+            Die();
     }
-    private void EatFood(int amount)
+    private void Die()
     {
-        _food += amount;
+        isLive = false;
+        _isMyTurn = false;
+        GetComponent<AudioSource>().PlayOneShot(_dieClip);
+        _anim.SetTrigger("Die");
+    }
+    private void TakeFood(int amount)
+    {
+        Food += amount;
         ChangeFoodAmount();
     }
-
+    private void LostFood(int amount)
+    {
+        Food -= amount;
+        ChangeFoodAmount();
+    }
 }
 
 [Serializable]

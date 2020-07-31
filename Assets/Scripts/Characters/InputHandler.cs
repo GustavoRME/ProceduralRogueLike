@@ -5,28 +5,48 @@ using UnityEngine.Events;
 [RequireComponent(typeof(Movement), typeof(Breaker))]
 public class InputHandler : MonoBehaviour
 {
+    [SerializeField] private Camera _camera = null;
     [SerializeField] private InputEvent _OnInput = null;
-    
+
+    Vector2 _inputPos;
+    bool _isPressed;
+
     private void Update()
-    {       
+    {
+        _inputPos = transform.position;
+        _isPressed = false;
+
+#if UNITY_STANDALONE || UNITY_EDITOR
         if(Input.GetMouseButtonDown(0))
         {
-            Vector2 inputPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            _inputPos = _camera.ScreenToWorldPoint(Input.mousePosition);
+            _isPressed = true;
+        }
+#elif UNITY_ANDROID
+        if(Input.touchCount > 0)
+        {
+            inputPos = _camera.ScreenToWorldPoint(Input.GetTouch(0).position);
+            isPressed = true;
+        }
+#endif
+
+        if (_isPressed)
+        {            
             InputDirection direction = InputDirection.None;
 
-            if (IsRight(transform.position, inputPos)) 
+            if (IsRight(transform.position, _inputPos)) 
             { 
                 direction = InputDirection.Right;
             }                         
-            else if(IsUpper(transform.position, inputPos))
+            else if(IsUpper(transform.position, _inputPos))
             {
                 direction = InputDirection.Up;
             }
-            else if(IsLeft(transform.position, inputPos))
+            else if(IsLeft(transform.position, _inputPos))
             {
                 direction = InputDirection.Left;
             }
-            else if(IsBottom(transform.position, inputPos))
+            else if(IsBottom(transform.position, _inputPos))
             {
                 direction = InputDirection.Down;
             }

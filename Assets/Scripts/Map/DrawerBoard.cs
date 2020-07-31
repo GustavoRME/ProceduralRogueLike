@@ -9,7 +9,7 @@ public class DrawerBoard
 	private readonly TileScriptable[] _floors;
 
 	private readonly CountScriptable _countWalls;
-
+	
 	public DrawerBoard(TileScriptable[] outerWalls, TileScriptable[] walls, TileScriptable[] floors, CountScriptable countWalls)
 	{		
 		_outerWalls = outerWalls;
@@ -19,7 +19,7 @@ public class DrawerBoard
 		_countWalls = countWalls;		
 	}    
 
-	public void DrawBoard(Tile[,] boardNode)
+	public void DrawBoard(Tile[,] boardNode, bool canDrawWalls)
 	{
 		_countWalls.Count = 0;
 
@@ -38,35 +38,38 @@ public class DrawerBoard
 				{					
 					SetUpNode(boardNode[x, y], _floors);
 				}
-				else
-				{					
-					if(Random.Range(0, 2) > 0 && !IsReachMaximum())
-					{						
-						SetUpNode(boardNode[x, y], _walls);
-						_countWalls.Count++;
-					}
-					else
-					{						
-						SetUpNode(boardNode[x, y], _floors);
-					}
-				}
+				else if(!canDrawWalls)
+				{										
+					SetUpNode(boardNode[x, y], _floors);
+				}				
 			}
 		}
 
-		if (!IsReachMinimum())
+		if(canDrawWalls && !IsReachMinimum())
 		{
-			for (int y = 0; y < heigth; y++)
+			while (!IsReachMinimum())
 			{
-				for (int x = 0; x < width; x++)
+				for (int y = 0; y < heigth; y++)
 				{
-					if (!IsOuterWallArea(x, y, width, heigth) && !IsFreeArea(x, y, width, heigth))
+					for (int x = 0; x < width; x++)
 					{
-						SetUpNode(boardNode[x, y], _walls);
-						_countWalls.Count++;
+						if (!IsOuterWallArea(x, y, width, heigth) && !IsFreeArea(x, y, width, heigth))
+						{
+							if (Random.Range(0, 2) > 0 && !IsReachMaximum())
+							{
+								SetUpNode(boardNode[x, y], _walls);
+								_countWalls.Count++;
+							}											
+						}
 					}
-				}
+				}			
 			}
 		}
+
+	}
+	public void Restart()
+	{
+
 	}
 
 	private void SetUpNode(Tile tile, TileScriptable[] scriptables)
@@ -79,5 +82,5 @@ public class DrawerBoard
 	private bool IsFreeArea(int x, int y, int width, int height) => x == 1 || y == 1 || x == width - 2 || y == height - 2;
 	private bool IsReachMinimum() => _countWalls.Count >= _countWalls.minimum;
 	private bool IsReachMaximum() => _countWalls.Count >= _countWalls.maximum;
-	private TileScriptable GetRandomTileScriptable(TileScriptable[] datas) => datas[Random.Range(0, datas.Length)]; 
+	private TileScriptable GetRandomTileScriptable(TileScriptable[] datas) => datas[Random.Range(0, datas.Length)]; 	
 }

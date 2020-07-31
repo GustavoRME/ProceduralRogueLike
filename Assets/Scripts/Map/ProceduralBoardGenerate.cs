@@ -1,9 +1,12 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class ProceduralBoardGenerate : MonoBehaviour
 {
+    private static Vector2 _upperRight = new Vector2(8, 8);
+    private static Vector2 _upperLeft = new Vector2(1, 8);
+    private static Vector2 _bottomRight = new Vector2(8, 1);
+    private static Vector2 _bottomLeft = new Vector2(1, 1);
+
     private Tile[,] _board;
     
     [Header("Board Settings")]
@@ -39,42 +42,63 @@ public class ProceduralBoardGenerate : MonoBehaviour
     private DrawerBoard _drawerBoard;
     private ItemPlacement _itemPlacement;
     private CharacterPlacement _characterPlacement;
-    
-    public bool aa = false;    
+
+    public bool CanDrawWalls { get; set; } = false;
+    public bool CanPlaceItems { get; set; } = false;
+    public bool CanPlaceEnemies { get; set; } = false;
+
+    public CountScriptable CountWalls { get => _countWalls; }
+    public CountScriptable CountTomatoes { get => _countTomatoes; }
+    public CountScriptable CountSodas { get => _countSodas; }
+    public CountScriptable CountEnemies { get => _countEnemies; }
 
     private void Awake()
     {                       
-        InitBoard();        
+        InitBoard();
+        
+        _drawerBoard = new DrawerBoard(_outerWalls, _walls, _floors, CreateCopy(_countWalls));
+        _itemPlacement = new ItemPlacement(_tomatoeModel, _sodaModel, CreateCopy(_countTomatoes), CreateCopy(_countSodas), _parentItems, _maxItems);
+        _characterPlacement = new CharacterPlacement(_player, _enemies, CreateCopy(_countEnemies), _width, _heigth);
 
-        _drawerBoard = new DrawerBoard(_outerWalls, _walls, _floors, _countWalls);
-        _itemPlacement = new ItemPlacement(_tomatoeModel, _sodaModel, _countTomatoes, _countSodas, _parentItems, _maxItems);
-        _characterPlacement = new CharacterPlacement(_player, _enemies, _countEnemies, _width, _heigth);
+        GenerateMap();       
+    }   
+    
+    public void GenerateMap()
+    {
+        _drawerBoard.DrawBoard(_board, CanDrawWalls);
+        _characterPlacement.PlaceCharacters(_board, false, CanPlaceEnemies);
+        
+        if(CanPlaceItems)
+            _itemPlacement.PlaceItems(_board);
 
-        _drawerBoard.DrawBoard(_board);
-        _itemPlacement.PlaceItems(_board);
-        _characterPlacement.PlaceCharacters(_board, false);
-
-        //Place exit according with player position
-        if(_characterPlacement.IsTop)
+        if (_characterPlacement.IsEnemiesOnTop)
         {
-            //Thinking...
+            if (Random.Range(0, 2) == 0)
+                _exit.transform.position = _bottomLeft;
+            else
+                _exit.transform.position = _bottomRight;
         }
         else
         {
-            _exit.transform.position = new Vector3(8, 8);
+            if (Random.Range(0, 2) == 0)
+                _exit.transform.position = _upperRight;
+            else
+                _exit.transform.position = _upperLeft;
         }
     }
-   
-    private void OnEnable()
+    public bool IsWalkableTile(int x, int y) => OnBounds(x, y) && _board[x, y].IsWalkable;
+    public bool IsBreakableTile(int x, int y) => OnBounds(x, y) && _board[x, y].IsBreakable;
+    public bool HasEnemy(int x, int y) => _characterPlacement.HasEnemy(x, y);
+    public Tile GetTile(int x, int y)
     {
-        if(aa)
-        {
-            _drawerBoard.DrawBoard(_board);
-            _itemPlacement.PlaceItems(_board);
-            _characterPlacement.PlaceCharacters(_board, false);
-        }
-    }   
+        if (!OnBounds(x, y))
+            return null;
 
+        return _board[x, y];
+    }
+    public void GetPlayerPosition(out int x, out int y) => _characterPlacement.GetPlayerPosition(out x, out y);
+    public GameObject[] GetEnemies() => _characterPlacement.EnemiesAtScene.ToArray();    
+    
     private void InitBoard()
     {
         _board = new Tile[_width, _heigth];
@@ -89,19 +113,15 @@ public class ProceduralBoardGenerate : MonoBehaviour
             }
         }
     }
-
-    private bool OnBounds(int x, int y) => x >= 0 && y >= 0 || x < _board.GetLength(0) && y < _board.GetLength(1);
-
-    public bool IsWalkableTile(int x, int y) => OnBounds(x, y) && _board[x, y].IsWalkable;
-
-    public bool IsBreakableTile(int x, int y) => OnBounds(x, y) && _board[x, y].IsBreakable;
-
-    public Tile GetTile(int x, int y)
+    private CountScriptable CreateCopy(CountScriptable count)
     {
-        if (!OnBounds(x, y))
-            return null;
+        CountScriptable copy = ScriptableObject.CreateInstance<CountScriptable>();
 
-        return _board[x, y];
+        copy.maximum = count.maximum;
+        copy.minimum = count.minimum;
+        copy.Count = 0;
+
+        return copy;
     }
-    
+    private bool OnBounds(int x, int y) => x >= 0 && y >= 0 || x < _board.GetLength(0) && y < _board.GetLength(1);    
 }

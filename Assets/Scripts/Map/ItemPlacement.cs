@@ -6,7 +6,7 @@ public class ItemPlacement
 {
     private const int MIN_DISTANCE = 3;
 
-    private List<GameObject> _foods;
+    private readonly List<GameObject> _foods;
 
     private readonly GameObject _tomatoe;
     private readonly GameObject _soda;
@@ -32,7 +32,6 @@ public class ItemPlacement
 
         _foods = new List<GameObject>();
     }
-
     public void PlaceItems(Tile[,] board)
     {
         Clear();
@@ -82,8 +81,8 @@ public class ItemPlacement
 
     private void Clear()
     {
-        foreach (var go in _foods)
-            Object.Destroy(go);
+        foreach (GameObject food in _foods)
+            Object.Destroy(food);
 
         _foods.Clear();
         

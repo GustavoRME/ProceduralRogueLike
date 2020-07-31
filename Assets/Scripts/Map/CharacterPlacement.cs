@@ -16,7 +16,9 @@ public class CharacterPlacement
     private readonly Vector3 _bottomLeft;
     private readonly Vector3 _bottomRight;
 
-    public bool IsTop { get; private set; }
+    public bool IsEnemiesOnTop { get; private set; }
+
+    public List<GameObject> EnemiesAtScene { get; private set; }
 
     public CharacterPlacement(GameObject player, GameObject[] enemies, CountScriptable countEnemies, int width, int heigth)
     {
@@ -25,13 +27,15 @@ public class CharacterPlacement
         _enemies = enemies;
         _countEnemies = countEnemies;
 
+        EnemiesAtScene = new List<GameObject>();
+
         _upperLeft = new Vector3(1, heigth - 2);
         _upperRight = new Vector3(width - 2, heigth - 2);
         _bottomLeft = new Vector3(1, 1);
         _bottomRight = new Vector3(width - 2, 1);
     }
 
-    public void PlaceCharacters(Tile[,] board, bool startRandomizePlayerPosition)
+    public void PlaceCharacters(Tile[,] board, bool startRandomizePlayerPosition, bool canPlaceEnemies)
     {
         PlacePlayer(startRandomizePlayerPosition);
         ClearEnemies();
@@ -39,26 +43,49 @@ public class CharacterPlacement
         int lastX = 0;
         int lastY = 0;
 
-        while (!IsReachMinimum())
+        if(canPlaceEnemies)
         {
-            for (int x = 0; x < board.GetLength(0); x++)
+            while (!IsReachMinimum())
             {
-                for (int y = 0; y < board.GetLength(1); y++)
+                for (int x = 0; x < board.GetLength(0); x++)
                 {
-                    if (IsWithinDistance(lastX, lastY, x, y))
+                    for (int y = 0; y < board.GetLength(1); y++)
                     {
-                        if (Random.Range(0, 10) > 8 && !IsReachMaximum())
+                        if (IsWithinDistance(lastX, lastY, x, y))
                         {
-                            if (board[x, y].IsWalkable)
-                                PlaceEnemy(x, y);
+                            if (Random.Range(0, 10) > 8 && !IsReachMaximum())
+                            {
+                                if (board[x, y].IsWalkable)
+                                    PlaceEnemy(x, y);
+                            }
                         }
-                    }
 
+                    }
                 }
             }
         }
 
     }              
+    public bool HasEnemy(int x, int y)
+    {
+        bool hasEnemy = false;
+
+        foreach (GameObject enemy in EnemiesAtScene)
+        {
+            if ((int)enemy.transform.position.x == x && (int)enemy.transform.position.y == y)
+            {
+                hasEnemy = true;
+                break;
+            }
+        }
+
+        return hasEnemy;
+    }
+    public void GetPlayerPosition(out int x, out int y)
+    {
+        x = (int)_player.transform.position.x;
+        y = (int)_player.transform.position.y;
+    }    
 
     private void PlacePlayer(bool start)
     {
@@ -69,26 +96,27 @@ public class CharacterPlacement
         else
         {
             _player.transform.position = _bottomLeft;
-            IsTop = false;
+            IsEnemiesOnTop = false;
         }
     }
     private void PlaceEnemy(int x, int y)
     {
         int index = Random.Range(0, _enemies.Length);
 
-        _enemies[index].transform.position = new Vector3(x, y);
-        _enemies[index].SetActive(true);
+        var instance = Object.Instantiate(_enemies[index], new Vector3(x, y), Quaternion.identity);
+
+        EnemiesAtScene.Add(instance);
 
         _countEnemies.Count++;
     }
     private void ClearEnemies()
     {
-        _countEnemies.Count = 0;
+        foreach (GameObject enemy in EnemiesAtScene)
+            Object.Destroy(enemy);
 
-        _enemies[0].SetActive(false);
-        _enemies[1].SetActive(false);
+        EnemiesAtScene.Clear();
+        _countEnemies.Count = 0;        
     }
-
     private bool IsReachMinimum() => _countEnemies.Count >= _countEnemies.minimum;
     private bool IsReachMaximum() => _countEnemies.Count >= _countEnemies.maximum;
     private bool IsWithinDistance(int x0, int y0, int x1, int y1) => (Mathf.Abs(x0 - x1) + Mathf.Abs(y0 - y1)) > MIN_DISTANCE;
